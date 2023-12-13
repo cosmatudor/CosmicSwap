@@ -1,2 +1,2 @@
 # CosmicSwap
-## Status -> in development
+## Status: in development
