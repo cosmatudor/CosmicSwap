@@ -60,6 +60,12 @@ describe("CosmicSwapRouter", function () {
 
         it("CASE 2: desiredAmount0 / desiredAmount1 > reserve0 / reserve1", async () => {
             // ex: 1100 / 200 > 500 / 100
+
+            const pairAddress = await factory.getPair(tokenA.target, tokenB.target);
+            const pair = await ethers.getContractAt("CosmicSwapPair", pairAddress);
+
+            const liquidityOwnerOld = await pair.balanceOf(owner.address);
+
             await router.connect(owner).addLiquidity(
                 tokenA.target,
                 tokenB.target,
@@ -68,21 +74,132 @@ describe("CosmicSwapRouter", function () {
                 owner.address
             );
 
+            expect(await tokenA.balanceOf(pairAddress)).to.equal(ethers.parseEther("1500")); // router should transfer only 1000 to pair
+            expect(await tokenB.balanceOf(pairAddress)).to.equal(ethers.parseEther("300"));
+
+            const [reserve0, reserve1] = await pair.getReserves();
+            const totalSupply = await pair.totalSupply();
+            const liquidity = parseFloat(1000n) * parseFloat(totalSupply) / parseFloat(reserve0) < parseFloat(200n) * parseFloat(totalSupply) / parseFloat(reserve1)
+                ? parseFloat(1000n) * parseFloat(totalSupply) / parseFloat(reserve0)
+                : parseFloat(200n) * parseFloat(totalSupply) / parseFloat(reserve1);
+            const newAddedLiquidity = await ethers.parseEther(liquidity.toString())
+
+
+            const TOLERANCE = 0.0000000001; // 10 ** -10
+            const expectedBalance = liquidityOwnerOld + newAddedLiquidity; // old total liquidity + new liquidity added
+            const actualBalance = await pair.totalSupply(); // must be equal to new total liquidity
+            const result = parseFloat((expectedBalance - actualBalance).toString());
+
+            expect(result).to.be.lessThan(TOLERANCE);
+            expect(await pair.balanceOf(owner.address)).to.equal(await pair.totalSupply() - ethers.parseEther("0.000000000000001"));
+        });
+
+        it("CASE 3: desiredAmount0 / desiredAmount1 < reserve0 / reserve1", async () => {
+            // ex: 1000 / 250 < 1500 / 300
+
             const pairAddress = await factory.getPair(tokenA.target, tokenB.target);
             const pair = await ethers.getContractAt("CosmicSwapPair", pairAddress);
 
-            expect(await tokenA.balanceOf(pairAddress)).to.equal(ethers.parseEther("1600"));
-            expect(await tokenB.balanceOf(pairAddress)).to.equal(ethers.parseEther("300"));
+            const liquidityOwnerOld = await pair.balanceOf(owner.address);
+
+            await router.connect(owner).addLiquidity(
+                tokenA.target,
+                tokenB.target,
+                ethers.parseEther("1000"),
+                ethers.parseEther("250"),
+                owner.address
+            );
+
+            expect(await tokenA.balanceOf(pairAddress)).to.equal(ethers.parseEther("2500"));
+            expect(await tokenB.balanceOf(pairAddress)).to.equal(ethers.parseEther("500")); // router should transfer only 200 to pair
+
+            const [reserve0, reserve1] = await pair.getReserves();
+            const totalSupply = await pair.totalSupply();
+            const liquidity = parseFloat(1000n) * parseFloat(totalSupply) / parseFloat(reserve0) < parseFloat(200n) * parseFloat(totalSupply) / parseFloat(reserve1)
+                ? parseFloat(1000n) * parseFloat(totalSupply) / parseFloat(reserve0)
+                : parseFloat(200n) * parseFloat(totalSupply) / parseFloat(reserve1);
+            const newAddedLiquidity = await ethers.parseEther(liquidity.toString())
 
 
+            const TOLERANCE = 0.0000000001; // 10 ** -10
+            const expectedBalance = liquidityOwnerOld + newAddedLiquidity; // old total liquidity + new liquidity added
+            const actualBalance = await pair.totalSupply(); // must be equal to new total liquidity
+            const result = parseFloat((expectedBalance - actualBalance).toString());
+
+            expect(result).to.be.lessThan(TOLERANCE);
+            expect(await pair.balanceOf(owner.address)).to.equal(await pair.totalSupply() - ethers.parseEther("0.000000000000001"));
         });
 
-        it("CASE 3: desiredAmount0 / desiredAmount1 < reserve0 / reserve1", async () => { });
+        it("CASE 4: desiredAmount0 / desiredAmount1 = reserve0 / reserve1", async () => {
+            // ex: 50 / 10 = 2500 / 500
 
-        it("CASE 4: desiredAmount0 / desiredAmount1 = reserve0 / reserve1", async () => { });
+            const pairAddress = await factory.getPair(tokenA.target, tokenB.target);
+            const pair = await ethers.getContractAt("CosmicSwapPair", pairAddress);
+
+            const liquidityOwnerOld = await pair.balanceOf(owner.address);
+
+            await router.connect(owner).addLiquidity(
+                tokenA.target,
+                tokenB.target,
+                ethers.parseEther("50"),
+                ethers.parseEther("10"),
+                owner.address
+            );
+
+            expect(await tokenA.balanceOf(pairAddress)).to.equal(ethers.parseEther("2550"));
+            expect(await tokenB.balanceOf(pairAddress)).to.equal(ethers.parseEther("510"));
+
+            const [reserve0, reserve1] = await pair.getReserves();
+            const totalSupply = await pair.totalSupply();
+            const liquidity = parseFloat(50n) * parseFloat(totalSupply) / parseFloat(reserve0) < parseFloat(10n) * parseFloat(totalSupply) / parseFloat(reserve1)
+                ? parseFloat(50n) * parseFloat(totalSupply) / parseFloat(reserve0)
+                : parseFloat(10n) * parseFloat(totalSupply) / parseFloat(reserve1);
+
+            const newAddedLiquidity = await ethers.parseEther(liquidity.toString())
+
+
+            const TOLERANCE = 0.0000000001; // 10 ** -10
+            const expectedBalance = liquidityOwnerOld + newAddedLiquidity; // old total liquidity + new liquidity added
+            expect(expectedBalance).to.be.greaterThan(liquidityOwnerOld);
+            const actualBalance = await pair.totalSupply(); // must be equal to new total liquidity
+            const result = parseFloat((actualBalance - expectedBalance).toString());
+
+            expect(result).to.be.lessThan(TOLERANCE);
+            expect(await pair.balanceOf(owner.address)).to.equal(await pair.totalSupply() - ethers.parseEther("0.000000000000001"));
+        });
     });
 
     describe("Removing liquidity", function () {
-        it("Should remove liquidity from pool and send it to user", async () => { });
+        let pair;
+
+        this.beforeAll(async function () {
+            // owner should allow CosmicSwap to remove liquidity from his balance
+            const pairAddress = await factory.getPair(tokenA.target, tokenB.target);
+            pair = await ethers.getContractAt("CosmicSwapPair", pairAddress);
+            await pair.connect(owner).approve(router.target, ethers.MaxUint256);
+        });
+
+        it("Should remove liquidity from pool and send it to user", async () => {
+
+            const supplyPreBurn = await pair.totalSupply();
+            const tokenAPreBurn = await tokenA.balanceOf(owner.address);
+            const tokenBPreBurn = await tokenB.balanceOf(owner.address);
+
+            // now let's burn some
+            await router.connect(owner).removeLiquidity(
+                tokenA.target,
+                tokenB.target,
+                ethers.parseEther("100"),
+                owner.address
+            )
+
+            const supplyPostBurn = await pair.totalSupply();
+            const tokenAPostBurn = await tokenA.balanceOf(owner.address);
+            const tokenBPostBurn = await tokenB.balanceOf(owner.address);
+
+            expect(supplyPreBurn - supplyPostBurn).to.equal(ethers.parseEther("100"));
+            expect(tokenAPreBurn).to.be.lessThan(tokenAPostBurn);
+            expect(tokenBPreBurn).to.be.lessThan(tokenBPostBurn);
+        });
     });
 });
