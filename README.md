@@ -1,7 +1,7 @@
 # CosmicSwap
 Status (Almost done): ✅contracts done; need more test
 
-## Contract Addresses:
+## Contract Addresses (Sepolia):
 ### Router: 0xA4c8Dc035f9370A10f71617FE44C516383a6cB35
 ### Factory: 0xf1De94B82F106316209D23408B8E7C12a9D47de8
 ### TokenA: 0x48E6A086A4C9F8F60bD7D68b5B218d05565cFc6d
