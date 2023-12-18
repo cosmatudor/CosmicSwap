@@ -40,11 +40,9 @@ contract CosmicSwapRouter {
         if (pair == address(0)) {
             pair = CosmicSwapFactory(factory).createPool(token0, token1);
         }
-        console.log("Pair: %s", pair);
         (amount0, amount1) = _computeLiquidity(pair, amountDesired0, amountDesired1);
         IERC20(token0).transferFrom(msg.sender, pair, amount0);
         IERC20(token1).transferFrom(msg.sender, pair, amount1);
-        console.log("Address: %s", to);
         liquidity = CosmicSwapPair(pair).mint(to);
     }
 
@@ -53,5 +51,28 @@ contract CosmicSwapRouter {
         address pair = CosmicSwapFactory(factory).getPair(token0, token1);
         CosmicSwapPair(pair).transferFrom(msg.sender, pair, liquidity);
         (amount0, amount1) = CosmicSwapPair(pair).burn(to);
+    }
+
+    /******** SWAP ********/
+    function swap(address tokenIn, address tokenOut, uint amountIn, address to) external returns(uint amountOut) {
+        // get the pair
+        address pair = CosmicSwapFactory(factory).getPair(tokenIn, tokenOut);
+        require(pair != address(0), "CosmicSwap: NO_PAIR");
+
+        // sort tokens and reserves
+        (address token0, ) = CosmicSwapLibrary.sortTokens(tokenIn, tokenOut);
+        (uint reserve0, uint reserve1) = CosmicSwapPair(pair).getReserves();
+        (uint reserveIn, uint reserveOut) = tokenIn == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
+        
+        // now that we have organized the amounts, we can compute the amount out
+        amountOut = CosmicSwapLibrary.computeSwapAmount(amountIn, reserveIn, reserveOut);
+        require(amountOut > 0, "CosmicSwap: INSUFFICIENT_OUTPUT_AMOUNT");
+
+        // check which amount is In and which is Out
+        (uint amount0Out, uint amount1Out) = token0 == tokenIn ? (uint(0), amountOut) : (amountOut, uint(0));
+
+        // transfer amountIn to pool and call low-level swap function
+        IERC20(tokenIn).transferFrom(msg.sender, pair, amountIn);
+        CosmicSwapPair(pair).swap(amount0Out, amount1Out, to);
     }
 }

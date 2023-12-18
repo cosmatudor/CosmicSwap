@@ -180,7 +180,6 @@ describe("CosmicSwapRouter", function () {
         });
 
         it("Should remove liquidity from pool and send it to user", async () => {
-
             const supplyPreBurn = await pair.totalSupply();
             const tokenAPreBurn = await tokenA.balanceOf(owner.address);
             const tokenBPreBurn = await tokenB.balanceOf(owner.address);
@@ -201,5 +200,25 @@ describe("CosmicSwapRouter", function () {
             expect(tokenAPreBurn).to.be.lessThan(tokenAPostBurn);
             expect(tokenBPreBurn).to.be.lessThan(tokenBPostBurn);
         });
+    });
+
+    describe("Swaping", function () {
+        let pair;
+
+        this.beforeAll(async function () {
+            const pairAddress = await factory.getPair(tokenA.target, tokenB.target);
+            pair = await ethers.getContractAt("CosmicSwapPair", pairAddress);
+        });
+
+        it("Should swap exact TokenA for TokenB", async () => {
+            await router.swap(
+                tokenB.target,
+                tokenA.target,
+                ethers.parseEther("80"),
+                owner.address
+            )
+        });
+
+        //TODO
     });
 });

@@ -5,8 +5,8 @@ const { adrTokenA, adrTokenB, adrFactory, adrRouter } = config
 
 
 async function main() {
-    const [signer0, signer1, signer2] = await ethers.getSigners();
-    const Router = await ethers.getContractAt("CosmicSwapRouter", adrRouter);
+    const [signer0] = await ethers.getSigners();
+    const Router = await ethers.getContractAt("CosmicSwapRouter", "0xA4c8Dc035f9370A10f71617FE44C516383a6cB35");
 
     removeLiquidity = async (signer, tokenAddress0, tokenAddress1, liquidity) => {
         const factoryAddress = await Router.factory(); // Get the factory address from the router
@@ -27,7 +27,7 @@ async function main() {
         console.log("Transaction hash: ", txn.hash)
     }
 
-    removeLiquidity(signer0, adrTokenA, adrTokenB, ethers.parseEther("10"));
+    removeLiquidity(signer0, "0x48E6A086A4C9F8F60bD7D68b5B218d05565cFc6d", "0x81ca188Ecea5BC1B91969EC94B1206584E25C367", ethers.parseEther("40"));
 }
 
 main().catch((error) => {
